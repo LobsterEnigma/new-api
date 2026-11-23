@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export {
   formatDuration,
-  formatEpaySubscriptionPrice,
   formatResetPeriod,
+  formatSubscriptionPrice,
   formatTimestamp,
 } from './format'
 export {

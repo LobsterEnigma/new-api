@@ -9,14 +9,15 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/text/currency"
 	"gorm.io/gorm"
 )
 
 // ---- Shared types ----
 
 type SubscriptionPlanDTO struct {
-	Plan       model.SubscriptionPlan `json:"plan"`
-	EpayAmount string                 `json:"epay_amount,omitempty"`
+	Plan         model.SubscriptionPlan `json:"plan"`
+	BalanceQuota *int                   `json:"balance_quota,omitempty"`
 }
 
 type BillingPreferenceRequest struct {
@@ -24,7 +25,8 @@ type BillingPreferenceRequest struct {
 }
 
 type SubscriptionBalancePayRequest struct {
-	PlanId int `json:"plan_id"`
+	PlanId        int  `json:"plan_id"`
+	ExpectedQuota *int `json:"expected_quota"`
 }
 
 // ---- User APIs ----
@@ -43,10 +45,13 @@ func GetSubscriptionPlans(c *gin.Context) {
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
 	for _, p := range plans {
 		p.NormalizeDefaults()
-		result = append(result, SubscriptionPlanDTO{
-			Plan:       p,
-			EpayAmount: subscriptionEpayAmount(p.PriceAmount),
-		})
+		record := SubscriptionPlanDTO{Plan: p}
+		if *p.AllowBalancePay {
+			if quota, err := p.BalanceQuota(); err == nil {
+				record.BalanceQuota = &quota
+			}
+		}
+		result = append(result, record)
 	}
 	common.ApiSuccess(c, result)
 }
@@ -110,7 +115,7 @@ func SubscriptionRequestBalancePay(c *gin.Context) {
 		return
 	}
 
-	if err := model.PurchaseSubscriptionWithBalance(userId, req.PlanId); err != nil {
+	if err := model.PurchaseSubscriptionWithBalance(userId, req.PlanId, req.ExpectedQuota); err != nil {
 		common.ApiError(c, err)
 		return
 	}
@@ -139,6 +144,17 @@ type AdminUpsertSubscriptionPlanRequest struct {
 	Plan model.SubscriptionPlan `json:"plan"`
 }
 
+func normalizeSubscriptionPlanCurrency(value string) (string, error) {
+	code := strings.ToUpper(strings.TrimSpace(value))
+	if code == "" {
+		return "", nil
+	}
+	if _, err := currency.ParseISO(code); err != nil || code == "XXX" || code == "XTS" {
+		return "", common.NewMessage("Invalid subscription price currency")
+	}
+	return code, nil
+}
+
 func AdminCreateSubscriptionPlan(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -162,16 +178,13 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Price cannot exceed 9999")
 		return
 	}
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
+	code, err := normalizeSubscriptionPlanCurrency(req.Plan.Currency)
+	if err != nil {
+		common.ApiError(c, err)
+		return
 	}
-	req.Plan.Currency = "USD"
-	if req.Plan.AllowBalancePay == nil {
-		req.Plan.AllowBalancePay = common.GetPointer(true)
-	}
-	if req.Plan.AllowWalletOverflow == nil {
-		req.Plan.AllowWalletOverflow = common.GetPointer(true)
-	}
+	req.Plan.Currency = code
+	req.Plan.NormalizeDefaults()
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}
@@ -205,7 +218,7 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Custom reset cycle must be greater than 0 seconds")
 		return
 	}
-	err := model.DB.Create(&req.Plan).Error
+	err = model.DB.Create(&req.Plan).Error
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -242,10 +255,11 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	req.Plan.Id = id
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
+	code, err := normalizeSubscriptionPlanCurrency(req.Plan.Currency)
+	if err != nil {
+		common.ApiError(c, err)
+		return
 	}
-	req.Plan.Currency = "USD"
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}
@@ -280,13 +294,12 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 
-	err := model.DB.Transaction(func(tx *gorm.DB) error {
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
 		// update plan (allow zero values updates with map)
 		updateMap := map[string]any{
 			"title":                      req.Plan.Title,
 			"subtitle":                   req.Plan.Subtitle,
 			"price_amount":               req.Plan.PriceAmount,
-			"currency":                   req.Plan.Currency,
 			"duration_unit":              req.Plan.DurationUnit,
 			"duration_value":             req.Plan.DurationValue,
 			"custom_seconds":             req.Plan.CustomSeconds,
@@ -302,6 +315,9 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,
 			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,
 			"updated_at":                 common.GetTimestamp(),
+		}
+		if code != "" {
+			updateMap["currency"] = code
 		}
 		if req.Plan.AllowBalancePay != nil {
 			updateMap["allow_balance_pay"] = *req.Plan.AllowBalancePay

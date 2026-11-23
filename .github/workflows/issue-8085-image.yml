@@ -10,8 +10,8 @@ permissions:
 
 env:
   IMAGE: ghcr.io/lobsterenigma/new-api
-  TAG: issue-8085
-  SOURCE_SHA: 603e0ac6decb6c61f021aa8c0a85359a70dfd327
+  TAG: issue-8085-v2
+  SOURCE_SHA: ${{ github.sha }}
 
 jobs:
   build:

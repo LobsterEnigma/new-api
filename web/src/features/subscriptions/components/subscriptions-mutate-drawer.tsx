@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, CreditCard, RefreshCw, Settings2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -63,6 +63,7 @@ import {
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { getPaymentErrorTranslation } from '@/features/wallet/lib/payment'
+import { toIntlLocale } from '@/i18n/languages'
 import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
 import { handleServerError } from '@/lib/handle-server-error'
 
@@ -90,12 +91,31 @@ interface Props {
   currentRow?: PlanRecord
 }
 
+const planCurrencies = Intl.supportedValuesOf?.('currency') ?? [
+  'AUD',
+  'CAD',
+  'CNY',
+  'EUR',
+  'GBP',
+  'HKD',
+  'JPY',
+  'USD',
+]
+
 export function SubscriptionsMutateDrawer({
   open,
   onOpenChange,
   currentRow,
 }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const currencyOptions = useMemo(() => {
+    const names = new Intl.DisplayNames(locale, { type: 'currency' })
+    return planCurrencies.map((code) => ({
+      value: code,
+      label: `${code} · ${names.of(code)}`,
+    }))
+  }, [locale])
   const isEdit = !!currentRow?.plan?.id
   const { triggerRefresh } = useSubscriptions()
   const { meta: currencyMeta } = getCurrencyDisplay()
@@ -351,16 +371,34 @@ export function SubscriptionsMutateDrawer({
                           }
                         />
                       </FormControl>
-                      <FormDescription>
-                        {t(
-                          'Amount the user pays to purchase this plan; the actual currency depends on the payment gateway.'
-                        )}
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name='currency'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Pricing currency')}</FormLabel>
+                      <FormControl>
+                        <Combobox
+                          {...field}
+                          options={currencyOptions}
+                          placeholder={t('Select currency')}
+                          onValueChange={(code) => {
+                            if (code) field.onChange(code)
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}
                   name='total_amount'

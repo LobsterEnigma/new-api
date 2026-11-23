@@ -22,17 +22,17 @@ import dayjs from '@/lib/dayjs'
 
 import type { SubscriptionPlan } from '../types'
 
-export function formatEpaySubscriptionPrice(
-  amount: string,
+export function formatSubscriptionPrice(
+  plan: Pick<SubscriptionPlan, 'price_amount' | 'currency'>,
   locale?: string
 ): string {
+  const currency = /^[A-Z]{3}$/.test(plan.currency) ? plan.currency : 'USD'
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'CNY',
-    currencyDisplay: 'narrowSymbol',
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(Number(amount))
+  }).format(plan.price_amount)
 }
 
 export function formatDuration(

@@ -50,7 +50,7 @@ export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 
 export interface PlanRecord {
   plan: SubscriptionPlan
-  epay_amount?: string
+  balance_quota?: number
 }
 
 // ============================================================================
@@ -93,6 +93,7 @@ export interface PlanPayload {
 export interface SubscriptionPayRequest {
   plan_id: number
   payment_method?: string
+  expected_quota?: number
 }
 
 export interface SubscriptionPayResponse {
