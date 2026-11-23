@@ -15,7 +15,8 @@ import (
 // ---- Shared types ----
 
 type SubscriptionPlanDTO struct {
-	Plan model.SubscriptionPlan `json:"plan"`
+	Plan       model.SubscriptionPlan `json:"plan"`
+	EpayAmount string                 `json:"epay_amount,omitempty"`
 }
 
 type BillingPreferenceRequest struct {
@@ -43,7 +44,8 @@ func GetSubscriptionPlans(c *gin.Context) {
 	for _, p := range plans {
 		p.NormalizeDefaults()
 		result = append(result, SubscriptionPlanDTO{
-			Plan: p,
+			Plan:       p,
+			EpayAmount: subscriptionEpayAmount(p.PriceAmount),
 		})
 	}
 	common.ApiSuccess(c, result)

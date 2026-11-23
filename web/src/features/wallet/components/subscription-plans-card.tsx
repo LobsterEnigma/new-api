@@ -51,29 +51,29 @@ import {
   updateBillingPreference,
 } from '@/features/subscriptions/api'
 import { SubscriptionPurchaseDialog } from '@/features/subscriptions/components/dialogs/subscription-purchase-dialog'
-import { formatDuration, formatResetPeriod } from '@/features/subscriptions/lib'
+import {
+  formatDuration,
+  formatEpaySubscriptionPrice,
+  formatResetPeriod,
+} from '@/features/subscriptions/lib'
 import type {
   PlanRecord,
   UserSubscriptionRecord,
 } from '@/features/subscriptions/types'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
-import type { PaymentMethod, TopupInfo } from '../types'
+import { PAYMENT_TYPES } from '../constants'
+import type { TopupInfo } from '../types'
 
 interface SubscriptionPlansCardProps {
   topupInfo: TopupInfo | null
   onAvailabilityChange?: (available: boolean) => void
   userQuota?: number
   onPurchaseSuccess?: () => void | Promise<void>
-}
-
-function getEpayMethods(payMethods: PaymentMethod[] = []): PaymentMethod[] {
-  return payMethods.filter(
-    (m) => m?.type && m.type !== 'stripe' && m.type !== 'creem'
-  )
 }
 
 function getBillingPreferenceLabel(
@@ -100,7 +100,8 @@ export function SubscriptionPlansCard({
   userQuota,
   onPurchaseSuccess,
 }: SubscriptionPlansCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
 
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [activeSubscriptions, setActiveSubscriptions] = useState<
@@ -121,10 +122,17 @@ export function SubscriptionPlansCard({
   const enableCreem = !!topupInfo?.enable_creem_topup
   const enableWaffoPancake = !!topupInfo?.enable_waffo_pancake_topup
   const enableOnlineTopUp = !!topupInfo?.enable_online_topup
-  const epayMethods = useMemo(
-    () => getEpayMethods(topupInfo?.pay_methods),
-    [topupInfo?.pay_methods]
-  )
+  const epayMethods = useMemo(() => {
+    if (!enableOnlineTopUp) return []
+    return (topupInfo?.pay_methods || []).filter(
+      (method) =>
+        method?.type &&
+        method.type !== PAYMENT_TYPES.STRIPE &&
+        method.type !== PAYMENT_TYPES.CREEM &&
+        method.type !== PAYMENT_TYPES.WAFFO &&
+        method.type !== PAYMENT_TYPES.WAFFO_PANCAKE
+    )
+  }, [enableOnlineTopUp, topupInfo?.pay_methods])
 
   const fetchPlans = useCallback(async () => {
     try {
@@ -529,7 +537,11 @@ export function SubscriptionPlansCard({
               const plan = p?.plan
               if (!plan) return null
               const totalAmount = Number(plan.total_amount || 0)
-              const price = Number(plan.price_amount || 0).toFixed(2)
+              const epayAmount =
+                epayMethods.length > 0 ? p.epay_amount : undefined
+              const price = epayAmount
+                ? formatEpaySubscriptionPrice(epayAmount, locale)
+                : plan.price_amount.toFixed(2)
               const isPopular = index === 0 && plans.length > 1
               const limit = Number(plan.max_purchase_per_user || 0)
               const count = planPurchaseCountMap.get(plan.id) || 0
@@ -580,8 +592,11 @@ export function SubscriptionPlansCard({
                     </div>
 
                     <div className='py-2'>
+                      <div className='text-muted-foreground text-xs'>
+                        {epayAmount ? t('Epay price') : t('Plan Price')}
+                      </div>
                       <span className='text-primary text-2xl font-bold'>
-                        ${price}
+                        {price}
                       </span>
                     </div>
 
@@ -646,7 +661,6 @@ export function SubscriptionPlansCard({
         enableStripe={enableStripe}
         enableCreem={enableCreem}
         enableWaffoPancake={enableWaffoPancake}
-        enableOnlineTopUp={enableOnlineTopUp}
         epayMethods={epayMethods}
         userQuota={userQuota}
         onPurchaseSuccess={onPurchaseSuccess}

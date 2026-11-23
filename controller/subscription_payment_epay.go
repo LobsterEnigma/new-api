@@ -22,6 +22,13 @@ type SubscriptionEpayPayRequest struct {
 	PaymentMethod string `json:"payment_method"`
 }
 
+func subscriptionEpayAmount(price float64) string {
+	if price < 0.01 {
+		return ""
+	}
+	return strconv.FormatFloat(price, 'f', 2, 64)
+}
+
 func SubscriptionRequestEpay(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -42,7 +49,8 @@ func SubscriptionRequestEpay(c *gin.Context) {
 		common.ApiErrorT(c, "Subscription plan is not enabled")
 		return
 	}
-	if plan.PriceAmount < 0.01 {
+	amount := subscriptionEpayAmount(plan.PriceAmount)
+	if amount == "" {
 		common.ApiErrorT(c, "Plan amount is too low")
 		return
 	}
@@ -103,7 +111,7 @@ func SubscriptionRequestEpay(c *gin.Context) {
 		Type:           req.PaymentMethod,
 		ServiceTradeNo: tradeNo,
 		Name:           fmt.Sprintf("SUB:%s", plan.Title),
-		Money:          strconv.FormatFloat(plan.PriceAmount, 'f', 2, 64),
+		Money:          amount,
 		Device:         epay.PC,
 		NotifyUrl:      notifyUrl,
 		ReturnUrl:      returnUrl,

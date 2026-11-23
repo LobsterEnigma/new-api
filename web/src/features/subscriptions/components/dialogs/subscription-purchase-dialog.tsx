@@ -26,8 +26,8 @@ import { GroupBadge } from '@/components/group-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
-import { Separator } from '@/components/ui/separator'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
@@ -39,7 +39,11 @@ import {
   paySubscriptionWaffoPancake,
   paySubscriptionBalance,
 } from '../../api'
-import { formatDuration, formatResetPeriod } from '../../lib'
+import {
+  formatDuration,
+  formatEpaySubscriptionPrice,
+  formatResetPeriod,
+} from '../../lib'
 import type { PlanRecord } from '../../types'
 
 interface PaymentMethod {
@@ -54,7 +58,6 @@ interface Props {
   enableStripe?: boolean
   enableCreem?: boolean
   enableWaffoPancake?: boolean
-  enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
   purchaseLimit?: number
   purchaseCount?: number
@@ -63,7 +66,8 @@ interface Props {
 }
 
 export function SubscriptionPurchaseDialog(props: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const { currency } = useSystemConfig()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
@@ -83,11 +87,10 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const hasCreem = props.enableCreem && !!plan.creem_product_id
   const hasWaffoPancake =
     props.enableWaffoPancake && !!plan.waffo_pancake_product_id
-  const hasEpay =
-    props.enableOnlineTopUp && (props.epayMethods || []).length > 0
-  const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
+  const epayAmount = props.plan?.epay_amount
+  const hasEpay = epayAmount && (props.epayMethods || []).length > 0
+  const hasHostedCheckout = hasStripe || hasCreem || hasWaffoPancake
   const totalAmount = Number(plan.total_amount || 0)
-  const price = Number(plan.price_amount || 0).toFixed(2)
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
       ? currency.quotaPerUnit
@@ -283,11 +286,6 @@ export function SubscriptionPurchaseDialog(props: Props) {
               <GroupBadge group={plan.upgrade_group} />
             </div>
           )}
-          <Separator />
-          <div className='flex items-center justify-between'>
-            <span className='text-sm font-medium'>{t('Amount Due')}</span>
-            <span className='text-primary text-lg font-bold'>${price}</span>
-          </div>
         </div>
 
         {limitReached && (
@@ -300,14 +298,20 @@ export function SubscriptionPurchaseDialog(props: Props) {
         )}
 
         <div className='flex flex-col gap-2 rounded-md border p-3'>
-          <div className='flex items-center justify-between gap-2 text-xs'>
-            <span className='text-muted-foreground'>{t('Required')}</span>
-            <span>{formatQuota(balanceCost)}</span>
-          </div>
-          <div className='flex items-center justify-between gap-2 text-xs'>
-            <span className='text-muted-foreground'>{t('Available')}</span>
-            <span>{formatQuota(userQuota)}</span>
-          </div>
+          {allowBalancePay && (
+            <>
+              <div className='flex items-center justify-between gap-2 text-xs'>
+                <span className='text-muted-foreground'>
+                  {t('Balance required')}
+                </span>
+                <span>{formatQuota(balanceCost)}</span>
+              </div>
+              <div className='flex items-center justify-between gap-2 text-xs'>
+                <span className='text-muted-foreground'>{t('Available')}</span>
+                <span>{formatQuota(userQuota)}</span>
+              </div>
+            </>
+          )}
           {!allowBalancePay ? (
             <Alert variant='destructive'>
               <AlertDescription>
@@ -332,63 +336,78 @@ export function SubscriptionPurchaseDialog(props: Props) {
           </Button>
         </div>
 
-        {hasAnyPayment && (
+        {(hasHostedCheckout || hasEpay) && (
           <div className='space-y-3'>
             <p className='text-muted-foreground text-xs'>
               {t('Select payment method')}
             </p>
-            {(hasStripe || hasCreem || hasWaffoPancake) && (
-              <div className='grid grid-cols-2 gap-2 sm:flex'>
-                {hasStripe && (
-                  <Button
-                    variant='outline'
-                    className='flex-1'
-                    onClick={handlePayStripe}
-                    disabled={paying || limitReached}
-                  >
-                    Stripe
-                  </Button>
-                )}
-                {hasCreem && (
-                  <Button
-                    variant='outline'
-                    className='flex-1'
-                    onClick={handlePayCreem}
-                    disabled={paying || limitReached}
-                  >
-                    Creem
-                  </Button>
-                )}
-                {hasWaffoPancake && (
-                  <Button
-                    variant='outline'
-                    className='flex-1'
-                    onClick={handlePayWaffoPancake}
-                    disabled={paying || limitReached}
-                  >
-                    Waffo Pancake
-                  </Button>
-                )}
+            {hasHostedCheckout && (
+              <div className='space-y-2'>
+                <p className='text-muted-foreground text-xs'>
+                  {t('Final price is shown at checkout.')}
+                </p>
+                <div className='grid grid-cols-2 gap-2 sm:flex'>
+                  {hasStripe && (
+                    <Button
+                      variant='outline'
+                      className='flex-1'
+                      onClick={handlePayStripe}
+                      disabled={paying || limitReached}
+                    >
+                      Stripe
+                    </Button>
+                  )}
+                  {hasCreem && (
+                    <Button
+                      variant='outline'
+                      className='flex-1'
+                      onClick={handlePayCreem}
+                      disabled={paying || limitReached}
+                    >
+                      Creem
+                    </Button>
+                  )}
+                  {hasWaffoPancake && (
+                    <Button
+                      variant='outline'
+                      className='flex-1'
+                      onClick={handlePayWaffoPancake}
+                      disabled={paying || limitReached}
+                    >
+                      Waffo Pancake
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
             {hasEpay && (
-              <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
-                <Combobox
-                  options={(props.epayMethods || []).map((m) => ({
-                    value: m.type,
-                    label: m.name || m.type,
-                  }))}
-                  value={selectedEpayMethod}
-                  onValueChange={(v) => v !== null && setSelectedEpayMethod(v)}
-                  disabled={limitReached}
-                  className='flex-1'
-                />
-                <Button
-                  onClick={handlePayEpay}
-                  disabled={paying || !selectedEpayMethod || limitReached}
-                >
-                  {t('Pay')}
-                </Button>
+              <div className='space-y-2'>
+                <div className='flex items-center justify-between gap-2'>
+                  <span className='text-sm font-medium'>{t('Epay price')}</span>
+                  <span className='text-primary text-lg font-bold'>
+                    {formatEpaySubscriptionPrice(epayAmount, locale)}
+                  </span>
+                </div>
+                <div className='grid grid-cols-[minmax(0,1fr)_auto] gap-2'>
+                  <Combobox
+                    options={(props.epayMethods || []).map((m) => ({
+                      value: m.type,
+                      label: m.name || m.type,
+                    }))}
+                    value={selectedEpayMethod}
+                    onValueChange={(v) =>
+                      v !== null && setSelectedEpayMethod(v)
+                    }
+                    disabled={limitReached}
+                    className='flex-1'
+                  />
+                  <Button
+                    onClick={handlePayEpay}
+                    disabled={paying || !selectedEpayMethod || limitReached}
+                  >
+                    {t('Pay')}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

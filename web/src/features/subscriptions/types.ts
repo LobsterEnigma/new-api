@@ -50,6 +50,7 @@ export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 
 export interface PlanRecord {
   plan: SubscriptionPlan
+  epay_amount?: string
 }
 
 // ============================================================================

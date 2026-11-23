@@ -22,6 +22,19 @@ import dayjs from '@/lib/dayjs'
 
 import type { SubscriptionPlan } from '../types'
 
+export function formatEpaySubscriptionPrice(
+  amount: string,
+  locale?: string
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'CNY',
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(amount))
+}
+
 export function formatDuration(
   plan: Partial<SubscriptionPlan>,
   t: TFunction
