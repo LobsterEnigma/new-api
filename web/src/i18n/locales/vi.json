@@ -4904,6 +4904,7 @@
     "Plan Name": "Tên gói",
     "Plan name cannot be empty": "Tên gói không được để trống",
     "Plan Price": "Giá gói",
+    "Plan Price ({{currency}})": "Giá gói ({{currency}})",
     "Plan price cannot be empty": "Giá gói không được để trống",
     "Plan price must be greater than zero": "Giá gói phải lớn hơn 0",
     "Plan Quota": "Hạn ngạch gói",

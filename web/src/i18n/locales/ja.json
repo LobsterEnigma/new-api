@@ -4904,6 +4904,7 @@
     "Plan Name": "プラン名",
     "Plan name cannot be empty": "プラン名を入力してください",
     "Plan Price": "プラン価格",
+    "Plan Price ({{currency}})": "プラン価格 ({{currency}})",
     "Plan price cannot be empty": "プランの価格を入力してください",
     "Plan price must be greater than zero": "プラン価格は 0 より大きい必要があります",
     "Plan Quota": "プランのクォータ",

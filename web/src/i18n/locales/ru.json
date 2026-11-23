@@ -4904,6 +4904,7 @@
     "Plan Name": "Название плана",
     "Plan name cannot be empty": "Название плана не может быть пустым",
     "Plan Price": "Цена тарифа",
+    "Plan Price ({{currency}})": "Цена тарифа ({{currency}})",
     "Plan price cannot be empty": "Цена плана не может быть пустой",
     "Plan price must be greater than zero": "Цена плана должна быть больше нуля",
     "Plan Quota": "Квота тарифа",

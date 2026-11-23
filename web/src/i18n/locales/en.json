@@ -4904,6 +4904,7 @@
     "Plan Name": "Plan Name",
     "Plan name cannot be empty": "Plan name cannot be empty",
     "Plan Price": "Plan Price",
+    "Plan Price ({{currency}})": "Plan Price ({{currency}})",
     "Plan price cannot be empty": "Plan price cannot be empty",
     "Plan price must be greater than zero": "Plan price must be greater than zero",
     "Plan Quota": "Plan Quota",

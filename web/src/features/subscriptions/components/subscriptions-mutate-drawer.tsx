@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, CreditCard, RefreshCw, Settings2 } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -33,7 +33,6 @@ import {
 } from '@/components/drawer-layout'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
-import { Field, FieldLabel } from '@/components/ui/field'
 import {
   Form,
   FormControl,
@@ -98,7 +97,6 @@ export function SubscriptionsMutateDrawer({
   currentRow,
 }: Props) {
   const { t } = useTranslation()
-  const priceCurrencyId = useId()
   const isEdit = !!currentRow?.plan?.id
   const { triggerRefresh } = useSubscriptions()
   const currency = useSystemConfigStore((state) => state.config.currency)
@@ -340,7 +338,11 @@ export function SubscriptionsMutateDrawer({
                   name='price_amount'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Plan Price')}</FormLabel>
+                      <FormLabel>
+                        {t('Plan Price ({{currency}})', {
+                          currency: tokensOnly ? 'USD' : currencyLabel,
+                        })}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -358,17 +360,6 @@ export function SubscriptionsMutateDrawer({
                     </FormItem>
                   )}
                 />
-
-                <Field className='gap-2'>
-                  <FieldLabel htmlFor={priceCurrencyId}>
-                    {t('Pricing currency')}
-                  </FieldLabel>
-                  <Input
-                    id={priceCurrencyId}
-                    value={tokensOnly ? 'USD' : currencyLabel}
-                    readOnly
-                  />
-                </Field>
               </div>
 
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>

@@ -4904,6 +4904,7 @@
     "Plan Name": "Nom du plan",
     "Plan name cannot be empty": "Le nom du forfait ne peut pas être vide",
     "Plan Price": "Prix du forfait",
+    "Plan Price ({{currency}})": "Prix du forfait ({{currency}})",
     "Plan price cannot be empty": "Le prix du forfait ne peut pas être vide",
     "Plan price must be greater than zero": "Le prix du forfait doit être supérieur à zéro",
     "Plan Quota": "Quota du forfait",

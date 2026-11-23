@@ -4904,6 +4904,7 @@
     "Plan Name": "套餐名稱",
     "Plan name cannot be empty": "套餐名稱不能為空",
     "Plan Price": "套餐價格",
+    "Plan Price ({{currency}})": "套餐價格 ({{currency}})",
     "Plan price cannot be empty": "套餐價格不能為空",
     "Plan price must be greater than zero": "套餐價格必須大於 0",
     "Plan Quota": "套餐額度",
