@@ -19,56 +19,42 @@ For commercial licensing, please contact support@quantumnous.com
 import { expect, it } from 'vitest'
 
 import { toIntlLocale } from '@/i18n/languages'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
+import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
 
-import { subscriptionPlanSchema } from '../../types'
-import { formatSubscriptionPrice } from '../format'
-import {
-  formValuesToPlanPayload,
-  PLAN_FORM_DEFAULTS,
-  planToFormValues,
-} from '../plan-form'
+const currency = {
+  ...DEFAULT_CURRENCY_CONFIG,
+  quotaDisplayType: 'CNY' as const,
+  usdExchangeRate: 7,
+}
 
-it.each(['CNY', 'USD', 'EUR'])(
-  'saves and restores %s without converting the plan price',
-  (currency) => {
-    const { plan } = formValuesToPlanPayload({
-      ...PLAN_FORM_DEFAULTS,
-      price_amount: 199.9,
-      currency,
-    })
-
-    expect(plan).toMatchObject({ currency, price_amount: 199.9 })
+it.each([
+  ['zhCN', '¥199'],
+  ['zhTW', '¥199'],
+  ['en', '¥199'],
+  ['fr', '199 ¥'],
+  ['ja', '￥199'],
+  ['ru', '199 ¥'],
+  ['vi', '199 ¥'],
+])(
+  'formats the configured price in %s without applying the exchange rate',
+  (language, price) => {
     expect(
-      planToFormValues(subscriptionPlanSchema.parse({ ...plan, id: 1 }))
-    ).toMatchObject({
-      currency,
-      price_amount: 199.9,
-    })
+      formatLocalCurrencyAmount(
+        199,
+        { locale: toIntlLocale(language) },
+        currency
+      ).replaceAll(/\s/g, ' ')
+    ).toBe(price)
   }
 )
 
-it.each([
-  ['zhCN', '¥199.90'],
-  ['zhTW', 'CN¥199.90'],
-  ['en', 'CN¥199.90'],
-  ['fr', '199,90 CNY'],
-  ['ja', '元 199.90'],
-  ['ru', '199,90 CN¥'],
-  ['vi', '199,90 CN¥'],
-])('formats the plan currency for %s', (language, price) => {
+it('uses the runtime locale when the interface language is invalid', () => {
   expect(
-    formatSubscriptionPrice(
-      { price_amount: 199.9, currency: 'CNY' },
-      toIntlLocale(language)
-    ).replaceAll(/\s/g, ' ')
-  ).toBe(price)
-})
-
-it('falls back to USD for a missing legacy currency and accepts an invalid locale', () => {
-  expect(
-    formatSubscriptionPrice(
-      { price_amount: 199.9, currency: '' },
-      toIntlLocale('invalid_locale')
+    formatLocalCurrencyAmount(
+      199,
+      { locale: toIntlLocale('invalid_locale') },
+      currency
     )
-  ).toMatch(/199[.,]90/)
+  ).toContain('199')
 })

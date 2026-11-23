@@ -38,13 +38,15 @@ func confirmPaymentComplianceForTest(t *testing.T) {
 	paymentSetting.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
 }
 
-func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
+func TestSubscriptionPriceFollowsSiteCurrency(t *testing.T) {
 	setupEpayCallbackTest(t)
 	operation_setting.GetPaymentSetting().EpaySignType = operation_setting.EpaySignTypeMD5
 	operation_setting.EpayKey = "test_key"
 	previousDB, previousLogDB := model.DB, model.LOG_DB
 	previousMain, previousLog := common.MainDatabaseType(), common.LogDatabaseType()
 	previousRate, previousUnit := operation_setting.USDExchangeRate, common.QuotaPerUnit
+	general := operation_setting.GetGeneralSetting()
+	previousDisplayType := general.QuotaDisplayType
 	previousRedis := common.RedisEnabled
 	common.RedisEnabled = false
 	t.Cleanup(func() {
@@ -52,6 +54,7 @@ func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
 		common.SetMainDatabaseType(previousMain)
 		common.SetLogDatabaseType(previousLog)
 		operation_setting.USDExchangeRate, common.QuotaPerUnit = previousRate, previousUnit
+		general.QuotaDisplayType = previousDisplayType
 		common.RedisEnabled = previousRedis
 	})
 	operation_setting.USDExchangeRate, common.QuotaPerUnit = 7, 500000
@@ -66,6 +69,7 @@ func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
 		{common.DatabaseTypePostgreSQL, "TEST_POSTGRES_DSN", "SHOW server_version"},
 	} {
 		t.Run(string(tc.kind), func(t *testing.T) {
+			general.QuotaDisplayType = operation_setting.QuotaDisplayTypeCNY
 			dsn := os.Getenv(tc.env)
 			if tc.env != "" && dsn == "" {
 				t.Skip(tc.env + " is not configured")
@@ -87,7 +91,6 @@ func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
 			router := gin.New()
 			router.Use(func(c *gin.Context) { c.Set("id", user.Id) })
 			router.POST("/plans", AdminCreateSubscriptionPlan)
-			router.PUT("/plans/:id", AdminUpdateSubscriptionPlan)
 			router.GET("/plans", GetSubscriptionPlans)
 			router.POST("/balance", SubscriptionRequestBalancePay)
 			router.POST("/epay", SubscriptionRequestEpay)
@@ -101,27 +104,23 @@ func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
 				return recorder
 			}
 
-			response := request(http.MethodPost, "/plans", `{"plan":{"title":"Plan","price_amount":199.9,"currency":" cny ","enabled":true}}`)
+			response := request(http.MethodPost, "/plans", `{"plan":{"title":"Plan","price_amount":199.9,"enabled":true}}`)
 			var created struct {
 				Success bool                   `json:"success"`
 				Data    model.SubscriptionPlan `json:"data"`
 			}
 			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &created))
 			require.True(t, created.Success, response.Body.String())
-			assert.Equal(t, "CNY", created.Data.Currency)
 			planID := created.Data.Id
 			t.Cleanup(func() { model.InvalidateSubscriptionPlanCache(planID) })
 
-			path := fmt.Sprintf("/plans/%d", planID)
-			response = request(http.MethodPut, path, `{"plan":{"title":"Updated","price_amount":199.9,"enabled":true}}`)
-			assert.Contains(t, response.Body.String(), `"success":true`)
 			response = request(http.MethodGet, "/plans", "")
 			var listed struct {
 				Data []SubscriptionPlanDTO `json:"data"`
 			}
 			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &listed))
 			require.Len(t, listed.Data, 1)
-			assert.Equal(t, "CNY", listed.Data[0].Plan.Currency)
+			assert.Equal(t, 199.9, listed.Data[0].Plan.PriceAmount)
 			require.NotNil(t, listed.Data[0].BalanceQuota)
 			assert.Equal(t, 14_278_572, *listed.Data[0].BalanceQuota)
 
@@ -141,14 +140,14 @@ func TestSubscriptionPlanCurrencyAndWalletCharge(t *testing.T) {
 			require.NoError(t, db.First(&user, user.Id).Error)
 			assert.Equal(t, 35_721_428, user.Quota)
 
-			response = request(http.MethodPut, path, `{"plan":{"title":"Updated","price_amount":199.9,"currency":"EUR","enabled":true}}`)
-			require.Contains(t, response.Body.String(), `"success":true`)
+			general.QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
 			listed.Data = nil
 			response = request(http.MethodGet, "/plans", "")
 			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &listed))
 			require.Len(t, listed.Data, 1)
-			assert.Equal(t, "EUR", listed.Data[0].Plan.Currency)
-			assert.Nil(t, listed.Data[0].BalanceQuota)
+			assert.Equal(t, 199.9, listed.Data[0].Plan.PriceAmount)
+			require.NotNil(t, listed.Data[0].BalanceQuota)
+			assert.Equal(t, 99_950_000, *listed.Data[0].BalanceQuota)
 		})
 	}
 }

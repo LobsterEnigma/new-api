@@ -19,8 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 export {
   formatDuration,
   formatResetPeriod,
-  formatSubscriptionPrice,
   formatTimestamp,
+  useSubscriptionPriceFormatter,
 } from './format'
 export {
   getPlanFormSchema,

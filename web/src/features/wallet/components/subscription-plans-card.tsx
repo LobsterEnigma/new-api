@@ -54,13 +54,12 @@ import { SubscriptionPurchaseDialog } from '@/features/subscriptions/components/
 import {
   formatDuration,
   formatResetPeriod,
-  formatSubscriptionPrice,
+  useSubscriptionPriceFormatter,
 } from '@/features/subscriptions/lib'
 import type {
   PlanRecord,
   UserSubscriptionRecord,
 } from '@/features/subscriptions/types'
-import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { requireServerSuccess } from '@/lib/server-error-message'
@@ -100,8 +99,8 @@ export function SubscriptionPlansCard({
   userQuota,
   onPurchaseSuccess,
 }: SubscriptionPlansCardProps) {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const { t } = useTranslation()
+  const formatPrice = useSubscriptionPriceFormatter()
 
   const [plans, setPlans] = useState<PlanRecord[]>([])
   const [activeSubscriptions, setActiveSubscriptions] = useState<
@@ -537,7 +536,7 @@ export function SubscriptionPlansCard({
               const plan = p?.plan
               if (!plan) return null
               const totalAmount = Number(plan.total_amount || 0)
-              const price = formatSubscriptionPrice(plan, locale)
+              const price = formatPrice(plan.price_amount)
               const isPopular = index === 0 && plans.length > 1
               const limit = Number(plan.max_purchase_per_user || 0)
               const count = planPurchaseCountMap.get(plan.id) || 0

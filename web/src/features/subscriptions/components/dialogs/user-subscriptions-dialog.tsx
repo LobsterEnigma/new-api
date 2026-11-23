@@ -48,7 +48,6 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
-import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { getServerMessage } from '@/lib/server-error-message'
@@ -61,7 +60,7 @@ import {
   deleteUserSubscription,
   resetUserSubscriptionsByPlan,
 } from '../../api'
-import { formatSubscriptionPrice, formatTimestamp } from '../../lib'
+import { formatTimestamp, useSubscriptionPriceFormatter } from '../../lib'
 import type { PlanRecord, UserSubscriptionRecord } from '../../types'
 
 interface Props {
@@ -107,8 +106,8 @@ function SubscriptionStatusBadge(props: {
 }
 
 export function UserSubscriptionsDialog(props: Props) {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const { t } = useTranslation()
+  const formatPrice = useSubscriptionPriceFormatter()
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [plans, setPlans] = useState<PlanRecord[]>([])
@@ -262,7 +261,7 @@ export function UserSubscriptionsDialog(props: Props) {
               <Combobox
                 options={plans.map((p) => ({
                   value: String(p.plan.id),
-                  label: `${p.plan.title} (${formatSubscriptionPrice(p.plan, locale)})`,
+                  label: `${p.plan.title} (${formatPrice(p.plan.price_amount)})`,
                 }))}
                 value={selectedPlanId}
                 onValueChange={(v) => v !== null && setSelectedPlanId(v)}

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 
@@ -32,8 +32,8 @@ import { SubscriptionPurchaseDialog } from '../dialogs/subscription-purchase-dia
 const plan = subscriptionPlanSchema.parse({
   id: 1,
   title: 'Budget Pro',
-  price_amount: 199.9,
-  currency: 'CNY',
+  price_amount: 199,
+  currency: 'USD',
   duration_unit: 'month',
   duration_value: 1,
   quota_reset_period: 'never',
@@ -49,10 +49,43 @@ afterEach(() => {
   useSystemConfigStore.getState().setConfig(initialConfig)
 })
 
-it('shows the plan currency and submits the quoted wallet deduction', async () => {
+it('uses the site currency for the same price when the display mode changes', () => {
   useSystemConfigStore
     .getState()
     .setConfig({ currency: DEFAULT_CURRENCY_CONFIG })
+  render(
+    <SubscriptionPurchaseDialog
+      open
+      onOpenChange={vi.fn()}
+      plan={{ plan: { ...plan, currency: 'EUR' } }}
+      epayMethods={[{ type: 'alipay' }]}
+    />
+  )
+  const dialog = within(screen.getByRole('dialog'))
+  expect(dialog.getByText('$199')).toBeVisible()
+
+  act(() => {
+    useSystemConfigStore.getState().setConfig({
+      currency: {
+        ...DEFAULT_CURRENCY_CONFIG,
+        quotaDisplayType: 'CNY',
+        usdExchangeRate: 7,
+      },
+    })
+  })
+  expect(dialog.getByText('¥199')).toBeVisible()
+})
+
+it('shows the same CNY price for the plan and the wallet deduction', async () => {
+  useSystemConfigStore
+    .getState()
+    .setConfig({
+      currency: {
+        ...DEFAULT_CURRENCY_CONFIG,
+        quotaDisplayType: 'CNY',
+        usdExchangeRate: 7,
+      },
+    })
   const pay = vi
     .spyOn(api, 'post')
     .mockResolvedValue({ data: { success: true } })
@@ -61,36 +94,19 @@ it('shows the plan currency and submits the quoted wallet deduction', async () =
     <SubscriptionPurchaseDialog
       open
       onOpenChange={vi.fn()}
-      plan={{ plan, balance_quota: 14_278_572 }}
+      plan={{ plan, balance_quota: 14_214_286 }}
       epayMethods={[{ type: 'alipay' }]}
       userQuota={50_000_000}
     />
   )
 
   const dialog = within(screen.getByRole('dialog'))
-  expect(dialog.getAllByText('CN¥199.90')).toHaveLength(1)
-  expect(dialog.getByText('$28.56')).toBeVisible()
+  expect(dialog.getAllByText('¥199')).toHaveLength(2)
   await user.click(dialog.getByRole('button', { name: 'Pay with Balance' }))
   await waitFor(() =>
     expect(pay).toHaveBeenCalledWith('/api/subscription/balance/pay', {
       plan_id: 1,
-      expected_quota: 14_278_572,
+      expected_quota: 14_214_286,
     })
   )
-})
-
-it('keeps the plan price visible when there is no wallet exchange rate', () => {
-  render(
-    <SubscriptionPurchaseDialog
-      open
-      onOpenChange={vi.fn()}
-      plan={{ plan: { ...plan, currency: 'EUR' } }}
-    />
-  )
-
-  const dialog = within(screen.getByRole('dialog'))
-  expect(dialog.getByText('€199.90')).toBeVisible()
-  expect(
-    dialog.getByRole('button', { name: 'Pay with Balance' })
-  ).toBeDisabled()
 })

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, CreditCard, RefreshCw, Settings2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ import {
 } from '@/components/drawer-layout'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
+import { Field, FieldLabel } from '@/components/ui/field'
 import {
   Form,
   FormControl,
@@ -63,9 +64,9 @@ import {
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { getPaymentErrorTranslation } from '@/features/wallet/lib/payment'
-import { toIntlLocale } from '@/i18n/languages'
-import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
+import { getCurrencyLabel } from '@/lib/currency'
 import { handleServerError } from '@/lib/handle-server-error'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import {
   createPlan,
@@ -91,35 +92,17 @@ interface Props {
   currentRow?: PlanRecord
 }
 
-const planCurrencies = Intl.supportedValuesOf?.('currency') ?? [
-  'AUD',
-  'CAD',
-  'CNY',
-  'EUR',
-  'GBP',
-  'HKD',
-  'JPY',
-  'USD',
-]
-
 export function SubscriptionsMutateDrawer({
   open,
   onOpenChange,
   currentRow,
 }: Props) {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const currencyOptions = useMemo(() => {
-    const names = new Intl.DisplayNames(locale, { type: 'currency' })
-    return planCurrencies.map((code) => ({
-      value: code,
-      label: `${code} · ${names.of(code)}`,
-    }))
-  }, [locale])
+  const { t } = useTranslation()
+  const priceCurrencyId = useId()
   const isEdit = !!currentRow?.plan?.id
   const { triggerRefresh } = useSubscriptions()
-  const { meta: currencyMeta } = getCurrencyDisplay()
-  const tokensOnly = currencyMeta.kind === 'tokens'
+  const currency = useSystemConfigStore((state) => state.config.currency)
+  const tokensOnly = currency.quotaDisplayType === 'TOKENS'
   const currencyLabel = getCurrencyLabel()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [groupOptions, setGroupOptions] = useState<string[]>([])
@@ -376,26 +359,16 @@ export function SubscriptionsMutateDrawer({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name='currency'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Pricing currency')}</FormLabel>
-                      <FormControl>
-                        <Combobox
-                          {...field}
-                          options={currencyOptions}
-                          placeholder={t('Select currency')}
-                          onValueChange={(code) => {
-                            if (code) field.onChange(code)
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <Field className='gap-2'>
+                  <FieldLabel htmlFor={priceCurrencyId}>
+                    {t('Pricing currency')}
+                  </FieldLabel>
+                  <Input
+                    id={priceCurrencyId}
+                    value={tokensOnly ? 'USD' : currencyLabel}
+                    readOnly
+                  />
+                </Field>
               </div>
 
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>

@@ -9,7 +9,6 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/text/currency"
 	"gorm.io/gorm"
 )
 
@@ -144,17 +143,6 @@ type AdminUpsertSubscriptionPlanRequest struct {
 	Plan model.SubscriptionPlan `json:"plan"`
 }
 
-func normalizeSubscriptionPlanCurrency(value string) (string, error) {
-	code := strings.ToUpper(strings.TrimSpace(value))
-	if code == "" {
-		return "", nil
-	}
-	if _, err := currency.ParseISO(code); err != nil || code == "XXX" || code == "XTS" {
-		return "", common.NewMessage("Invalid subscription price currency")
-	}
-	return code, nil
-}
-
 func AdminCreateSubscriptionPlan(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -178,12 +166,7 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Price cannot exceed 9999")
 		return
 	}
-	code, err := normalizeSubscriptionPlanCurrency(req.Plan.Currency)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	req.Plan.Currency = code
+	req.Plan.Currency = "USD"
 	req.Plan.NormalizeDefaults()
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
@@ -218,7 +201,7 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Custom reset cycle must be greater than 0 seconds")
 		return
 	}
-	err = model.DB.Create(&req.Plan).Error
+	err := model.DB.Create(&req.Plan).Error
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -255,11 +238,6 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	req.Plan.Id = id
-	code, err := normalizeSubscriptionPlanCurrency(req.Plan.Currency)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}
@@ -294,7 +272,7 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 
-	err = model.DB.Transaction(func(tx *gorm.DB) error {
+	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		// update plan (allow zero values updates with map)
 		updateMap := map[string]any{
 			"title":                      req.Plan.Title,
@@ -315,9 +293,6 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,
 			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,
 			"updated_at":                 common.GetTimestamp(),
-		}
-		if code != "" {
-			updateMap["currency"] = code
 		}
 		if req.Plan.AllowBalancePay != nil {
 			updateMap["allow_balance_pay"] = *req.Plan.AllowBalancePay

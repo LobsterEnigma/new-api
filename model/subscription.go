@@ -216,9 +216,6 @@ func (p *SubscriptionPlan) BeforeUpdate(tx *gorm.DB) error {
 }
 
 func (p *SubscriptionPlan) NormalizeDefaults() {
-	if strings.TrimSpace(p.Currency) == "" {
-		p.Currency = "USD"
-	}
 	if p.AllowBalancePay == nil {
 		p.AllowBalancePay = common.GetPointer(true)
 	}
@@ -770,20 +767,9 @@ func (p SubscriptionPlan) BalanceQuota() (int, error) {
 	if common.QuotaPerUnit <= 0 || math.IsNaN(common.QuotaPerUnit) || math.IsInf(common.QuotaPerUnit, 0) {
 		return 0, common.NewMessage("Quota unit is misconfigured")
 	}
-	rate := 1.0
-	switch p.Currency {
-	case "", "USD":
-	case "CNY":
-		rate = operation_setting.USDExchangeRate
-	default:
-		settings := operation_setting.GetGeneralSetting()
-		if !strings.EqualFold(strings.TrimSpace(settings.CustomCurrencySymbol), p.Currency) {
-			return 0, common.NewMessage("Wallet exchange rate is unavailable for this currency")
-		}
-		rate = settings.CustomCurrencyExchangeRate
-	}
+	rate := operation_setting.GetUsdToCurrencyRate(operation_setting.USDExchangeRate)
 	if rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
-		return 0, common.NewMessage("Wallet exchange rate is unavailable for this currency")
+		return 0, common.NewMessage("Balance payment is unavailable")
 	}
 	amount := decimal.NewFromFloat(p.PriceAmount).Mul(decimal.NewFromFloat(common.QuotaPerUnit))
 	quota, remainder := amount.QuoRem(decimal.NewFromFloat(rate), 0)
@@ -800,7 +786,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int, expectedQuota *int)
 	}
 
 	var logPlanTitle string
-	var logMoney string
+	var logMoney float64
 	var chargedQuota int
 	var upgradeGroup string
 	err := DB.Transaction(func(tx *gorm.DB) error {
@@ -861,7 +847,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int, expectedQuota *int)
 		}
 
 		logPlanTitle = plan.Title
-		logMoney = fmt.Sprintf("%.2f %s", plan.PriceAmount, plan.Currency)
+		logMoney = plan.PriceAmount
 		chargedQuota = requiredQuota
 		if subscription.PrevUserGroup != "" {
 			upgradeGroup = strings.TrimSpace(subscription.UpgradeGroup)
@@ -882,7 +868,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int, expectedQuota *int)
 	}
 	RecordLog(userId, LogTypeTopup, common.NewMessage("Subscription purchased with balance, plan: {{plan}}, payment amount: {{amount}}, quota deducted: {{quota}}", map[string]any{
 		"plan":   logPlanTitle,
-		"amount": logMoney,
+		"amount": fmt.Sprintf("%.2f", logMoney),
 		"quota":  chargedQuota,
 	}))
 	return nil

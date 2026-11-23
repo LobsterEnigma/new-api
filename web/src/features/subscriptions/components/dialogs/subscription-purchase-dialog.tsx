@@ -27,7 +27,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import { Separator } from '@/components/ui/separator'
-import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 
@@ -41,7 +40,7 @@ import {
 import {
   formatDuration,
   formatResetPeriod,
-  formatSubscriptionPrice,
+  useSubscriptionPriceFormatter,
 } from '../../lib'
 import type { PlanRecord } from '../../types'
 
@@ -65,8 +64,8 @@ interface Props {
 }
 
 export function SubscriptionPurchaseDialog(props: Props) {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const { t } = useTranslation()
+  const formatPrice = useSubscriptionPriceFormatter()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
 
@@ -96,7 +95,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
   if (!allowBalancePay) {
     balanceError = t('This plan does not allow balance redemption')
   } else if (balanceCost === undefined) {
-    balanceError = t('Wallet exchange rate is unavailable for this currency')
+    balanceError = t('Balance payment is unavailable')
   } else if (userQuota < balanceCost) {
     balanceError = t('Insufficient balance')
   }
@@ -292,7 +291,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
           <div className='flex items-center justify-between gap-2'>
             <span className='text-sm font-medium'>{t('Plan Price')}</span>
             <span className='text-primary text-lg font-bold'>
-              {formatSubscriptionPrice(plan, locale)}
+              {formatPrice(plan.price_amount)}
             </span>
           </div>
         </div>

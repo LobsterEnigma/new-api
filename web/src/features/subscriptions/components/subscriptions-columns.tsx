@@ -24,20 +24,19 @@ import { BadgeCell } from '@/components/data-table'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
-import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
 
 import {
   formatDuration,
   formatResetPeriod,
-  formatSubscriptionPrice,
+  useSubscriptionPriceFormatter,
 } from '../lib'
 import type { PlanRecord } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 
 export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const { t } = useTranslation()
+  const formatPrice = useSubscriptionPriceFormatter()
 
   return useMemo(
     (): ColumnDef<PlanRecord>[] => [
@@ -75,7 +74,7 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
         header: t('Plan Price'),
         cell: ({ row }) => (
           <span className='font-semibold text-emerald-600'>
-            {formatSubscriptionPrice(row.original.plan, locale)}
+            {formatPrice(row.original.plan.price_amount)}
           </span>
         ),
         size: 100,
@@ -206,6 +205,6 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
         meta: { pinned: 'right' as const },
       },
     ],
-    [t, locale]
+    [t, formatPrice]
   )
 }
